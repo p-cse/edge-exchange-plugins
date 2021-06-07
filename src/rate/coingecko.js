@@ -110,8 +110,28 @@ const coinGeckoMap = {
   BAND: 'band-protocol',
   REN: 'republic-protocol',
   AMPL: 'ampleforth',
-  HBAR: 'hedera-hashgraph',
-  OCEAN: 'ocean-protocol'
+  OCEAN: 'ocean-protocol',
+  COMBO: 'furucombo',
+  FTM: 'fantom',
+  WAX: 'wax',
+  ABAT: 'aave-bat',
+  ADAI: 'aave-dai',
+  AKNC: 'aave-knc',
+  ALINK: 'aave-link',
+  AMANA: 'aave-mana',
+  AMKR: 'aave-mkr',
+  AREN: 'aave-ren',
+  ASNX: 'aave-snx',
+  ASUSD: 'aave-susd',
+  AUNI: 'aave-uni',
+  AUSDC: 'aave-usdc',
+  AUSDT: 'aave-usdt',
+  AWBTC: 'aave-wbtc',
+  AWETH: 'aave-weth',
+  AYFI: 'aave-yfi',
+  AZRX: 'aave-zrx',
+  UNI: 'uniswap',
+  HBAR: 'hedera-hashgraph'
 }
 
 export function makeCoinGeckoPlugin(

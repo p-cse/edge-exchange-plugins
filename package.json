@@ -46,6 +46,7 @@
     "esm": "^3.2.4",
     "hashjs": "^1.2.0",
     "iso4217": "^0.2.0",
+    "spookyswap-sdk": "https://github.com/SpookySwap/spookyswap-sdk#991ddb5c4d8df717a1ea97becb324bc07089b3a3",
     "utf8": "^3.0.0"
   },
   "devDependencies": {

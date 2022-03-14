@@ -35,7 +35,7 @@ function parseUtf8(text: string): Uint8Array {
 }
 
 const pluginId = 'changehero'
-const swapInfo = {
+const swapInfo: EdgeSwapInfo = {
   pluginId,
   displayName: 'ChangeHero',
 
@@ -129,13 +129,12 @@ export function makeChangeHeroPlugin(
       'api-key': apiKey,
       sign
     }
-    const reply = await fetchCors(uri, { method: 'POST', body, headers })
+    const response = await fetchCors(uri, { method: 'POST', body, headers })
 
-    if (!reply.ok) {
-      throw new Error(`ChangeHero returned error code ${reply.status}`)
+    if (!response.ok) {
+      throw new Error(`ChangeHero returned error code ${response.status}`)
     }
-    const out = reply.json
-    return out
+    return response.json()
   }
 
   const out: EdgeSwapPlugin = {
@@ -190,6 +189,7 @@ export function makeChangeHeroPlugin(
         request.quoteFor === 'from'
           ? fixedRateQuote.result.maxFrom
           : fixedRateQuote.result.maxTo
+
       const nativeMin = await request.fromWallet.denominationToNative(
         min,
         request.fromCurrencyCode

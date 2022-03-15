@@ -12,27 +12,8 @@ import {
   SwapBelowLimitError,
   SwapCurrencyError
 } from 'edge-core-js/types'
-import hashjs from 'hash.js'
-import { base16 } from 'rfc4648'
-import utf8Codec from 'utf8'
 
 import { makeSwapPluginQuote } from '../swap-helpers.js'
-
-function hmacSha512(data: Uint8Array, key: Uint8Array): Uint8Array {
-  const hmac = hashjs.hmac(hashjs.sha512, key)
-  return hmac.update(data).digest()
-}
-
-function parseUtf8(text: string): Uint8Array {
-  const byteString: string = utf8Codec.encode(text)
-  const out = new Uint8Array(byteString.length)
-
-  for (let i = 0; i < byteString.length; ++i) {
-    out[i] = byteString.charCodeAt(i)
-  }
-
-  return out
-}
 
 const pluginId = 'changehero'
 const swapInfo: EdgeSwapInfo = {
@@ -112,22 +93,17 @@ export function makeChangeHeroPlugin(
   const { initOptions, io } = opts
   const { fetchCors = io.fetch } = io
 
-  if (initOptions.apiKey == null || initOptions.secret == null) {
+  if (initOptions.apiKey == null) {
     throw new Error('No ChangeHero apiKey or secret provided.')
   }
   const { apiKey } = initOptions
-  const secret = parseUtf8(initOptions.secret)
 
   async function call(json: any) {
     const body = JSON.stringify(json)
-    const sign = base16
-      .stringify(hmacSha512(parseUtf8(body), secret))
-      .toLowerCase()
 
     const headers = {
       'Content-Type': 'application/json',
-      'api-key': apiKey,
-      sign
+      'api-key': apiKey
     }
     const response = await fetchCors(uri, { method: 'POST', body, headers })
 

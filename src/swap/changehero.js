@@ -4,6 +4,7 @@ import { gt, lt, mul } from 'biggystring'
 import {
   type EdgeCorePluginOptions,
   type EdgeCurrencyWallet,
+  type EdgeSpendInfo,
   type EdgeSwapPlugin,
   type EdgeSwapQuote,
   type EdgeSwapRequest,
@@ -13,17 +14,31 @@ import {
   SwapCurrencyError
 } from 'edge-core-js/types'
 
-import { makeSwapPluginQuote } from '../swap-helpers.js'
+import { makeSwapPluginQuote, safeCurrencyCodes } from '../swap-helpers.js'
+
+const CURRENCY_CODE_TRANSCRIPTION = {
+  ethereum: {
+    USDT: 'USDT20'
+  },
+  avalanche: {
+    AVAX: 'AVAXC'
+  },
+  binancesmartchain: {
+    BNB: 'BNBBSC'
+  },
+  polygon: {
+    MATIC: 'POLYGON'
+  }
+}
 
 const pluginId = 'changehero'
 const swapInfo: EdgeSwapInfo = {
   pluginId,
   displayName: 'ChangeHero',
-
-  // orderUri: 'https://changehero.io/transaction/',
   supportEmail: 'support@changehero.io'
 }
 
+const orderUri = 'https://changehero.io/transaction/'
 const uri = 'https://api.changehero.io/v2'
 const expirationMs = 1000 * 60 * 20
 const expirationFixedMs = 1000 * 60 * 5
@@ -90,7 +105,7 @@ function checkReply(reply: Object, request: EdgeSwapRequest) {
 export function makeChangeHeroPlugin(
   opts: EdgeCorePluginOptions
 ): EdgeSwapPlugin {
-  const { initOptions, io } = opts
+  const { initOptions, io, log } = opts
   const { fetchCors = io.fetch } = io
 
   if (initOptions.apiKey == null) {
@@ -148,13 +163,18 @@ export function makeChangeHeroPlugin(
               request.toCurrencyCode
             )
 
+      const { safeFromCurrencyCode, safeToCurrencyCode } = safeCurrencyCodes(
+        CURRENCY_CODE_TRANSCRIPTION,
+        request
+      )
+
       const fixedRateQuote = await call({
         jsonrpc: '2.0',
         id: 'one',
         method: 'getFixRate',
         params: {
-          from: request.fromCurrencyCode,
-          to: request.toCurrencyCode
+          from: safeFromCurrencyCode,
+          to: safeToCurrencyCode
         }
       })
       const min =
@@ -168,11 +188,11 @@ export function makeChangeHeroPlugin(
 
       const nativeMin = await request.fromWallet.denominationToNative(
         min,
-        request.fromCurrencyCode
+        safeFromCurrencyCode
       )
       const nativeMax = await request.fromWallet.denominationToNative(
         max,
-        request.fromCurrencyCode
+        safeFromCurrencyCode
       )
       if (lt(request.nativeAmount, nativeMin)) {
         throw new SwapBelowLimitError(swapInfo, nativeMin)
@@ -184,8 +204,8 @@ export function makeChangeHeroPlugin(
         request.quoteFor === 'from'
           ? {
               amount: quoteAmount,
-              from: request.fromCurrencyCode,
-              to: request.toCurrencyCode,
+              from: safeFromCurrencyCode,
+              to: safeToCurrencyCode,
               address: toAddress,
               extraId: null,
               refundAddress: fromAddress,
@@ -194,8 +214,8 @@ export function makeChangeHeroPlugin(
             }
           : {
               amountTo: quoteAmount,
-              from: request.fromCurrencyCode,
-              to: request.toCurrencyCode,
+              from: safeFromCurrencyCode,
+              to: safeToCurrencyCode,
               address: toAddress,
               extraId: null,
               refundAddress: fromAddress,
@@ -213,35 +233,45 @@ export function makeChangeHeroPlugin(
       const quoteInfo: FixedQuoteInfo = sendReply.result
       const spendInfoAmount = await request.fromWallet.denominationToNative(
         quoteInfo.amountExpectedFrom,
-        quoteInfo.currencyFrom.toUpperCase()
+        request.fromCurrencyCode.toUpperCase()
       )
-
-      const spendInfo = {
-        currencyCode: request.fromCurrencyCode,
-        spendTargets: [
-          {
-            nativeAmount: spendInfoAmount,
-            publicAddress: quoteInfo.payinAddress,
-            otherParams: {
-              uniqueIdentifier: quoteInfo.payinExtraId
-            }
-          }
-        ]
-      }
-      const tx: EdgeTransaction = await request.fromWallet.makeSpend(spendInfo)
-      if (tx.otherParams == null) tx.otherParams = {}
-      tx.otherParams.payinAddress = spendInfo.spendTargets[0].publicAddress
-      tx.otherParams.uniqueIdentifier =
-        spendInfo.spendTargets[0].otherParams.uniqueIdentifier
 
       const amountExpectedFromNative = await request.fromWallet.denominationToNative(
         sendReply.result.amountExpectedFrom,
         request.fromCurrencyCode
       )
-      const amountExpectedToTo = await request.fromWallet.denominationToNative(
+      const amountExpectedToTo = await request.toWallet.denominationToNative(
         sendReply.result.amountExpectedTo,
         request.toCurrencyCode
       )
+
+      const spendInfo: EdgeSpendInfo = {
+        currencyCode: request.fromCurrencyCode,
+        spendTargets: [
+          {
+            nativeAmount: spendInfoAmount,
+            publicAddress: quoteInfo.payinAddress,
+            uniqueIdentifier: quoteInfo.payinExtraId || undefined
+          }
+        ],
+        networkFeeOption:
+          request.fromCurrencyCode.toUpperCase() === 'BTC'
+            ? 'high'
+            : 'standard',
+        swapData: {
+          orderId: quoteInfo.id,
+          orderUri: orderUri + quoteInfo.id,
+          isEstimate: false,
+          payoutAddress: toAddress,
+          payoutCurrencyCode: request.toCurrencyCode,
+          payoutNativeAmount: amountExpectedToTo,
+          payoutWalletId: request.toWallet.id,
+          plugin: { ...swapInfo },
+          refundAddress: fromAddress
+        }
+      }
+      const tx: EdgeTransaction = await request.fromWallet.makeSpend(spendInfo)
+
       return makeSwapPluginQuote(
         request,
         amountExpectedFromNative,
@@ -254,6 +284,7 @@ export function makeChangeHeroPlugin(
         quoteInfo.id
       )
     },
+
     async getEstimate(
       request: EdgeSwapRequest,
       userSettings: Object | void
@@ -276,17 +307,27 @@ export function makeChangeHeroPlugin(
               request.toCurrencyCode
             )
 
+      let safeFromCurrencyCode = request.fromCurrencyCode
+      let safeToCurrencyCode = request.toCurrencyCode
+      if (CURRENCY_CODE_TRANSCRIPTION[request.fromCurrencyCode]) {
+        safeFromCurrencyCode =
+          CURRENCY_CODE_TRANSCRIPTION[request.fromCurrencyCode]
+      }
+      if (CURRENCY_CODE_TRANSCRIPTION[request.toCurrencyCode]) {
+        safeToCurrencyCode = CURRENCY_CODE_TRANSCRIPTION[request.toCurrencyCode]
+      }
+
       // Swap the currencies if we need a reverse quote:
       const quoteParams =
         request.quoteFor === 'from'
           ? {
-              from: request.fromCurrencyCode,
-              to: request.toCurrencyCode,
+              from: safeFromCurrencyCode,
+              to: safeToCurrencyCode,
               amount: quoteAmount
             }
           : {
-              from: request.toCurrencyCode,
-              to: request.fromCurrencyCode,
+              from: safeToCurrencyCode,
+              to: safeFromCurrencyCode,
               amount: quoteAmount
             }
 
@@ -297,8 +338,8 @@ export function makeChangeHeroPlugin(
           id: 'one',
           method: 'getMinAmount',
           params: {
-            from: request.fromCurrencyCode,
-            to: request.toCurrencyCode
+            from: safeFromCurrencyCode,
+            to: safeToCurrencyCode
           }
         }),
         call({
@@ -309,6 +350,16 @@ export function makeChangeHeroPlugin(
         })
       ])
       checkReply(quoteReplies[0], request)
+
+      // Check the minimum:
+      const nativeMin = await request.fromWallet.denominationToNative(
+        quoteReplies[0].result,
+        request.fromCurrencyCode
+      )
+      if (lt(request.nativeAmount, nativeMin)) {
+        throw new SwapBelowLimitError(swapInfo, nativeMin)
+      }
+
       checkReply(quoteReplies[1], request)
 
       // Calculate the amounts:
@@ -329,15 +380,6 @@ export function makeChangeHeroPlugin(
         toNativeAmount = request.nativeAmount
       }
 
-      // Check the minimum:
-      const nativeMin = await request.fromWallet.denominationToNative(
-        quoteReplies[0].result,
-        request.fromCurrencyCode
-      )
-      if (lt(fromNativeAmount, nativeMin)) {
-        throw new SwapBelowLimitError(swapInfo, nativeMin)
-      }
-
       // Get the address:
       const sendReply = await call({
         jsonrpc: '2.0',
@@ -345,10 +387,10 @@ export function makeChangeHeroPlugin(
         method: 'createTransaction',
         params: {
           amount: fromAmount,
-          from: request.fromCurrencyCode,
-          to: request.toCurrencyCode,
+          from: safeFromCurrencyCode,
+          to: safeToCurrencyCode,
           address: toAddress,
-          extraId: null, // TODO: Do we need this for Monero?
+          extraId: null,
           refundAddress: fromAddress,
           refundExtraId: null
         }
@@ -356,25 +398,29 @@ export function makeChangeHeroPlugin(
       checkReply(sendReply, request)
       const quoteInfo: QuoteInfo = sendReply.result
       // Make the transaction:
-      const spendInfo = {
+      const spendInfo: EdgeSpendInfo = {
         currencyCode: request.fromCurrencyCode,
         spendTargets: [
           {
             nativeAmount: fromNativeAmount,
             publicAddress: quoteInfo.payinAddress,
-            otherParams: {
-              uniqueIdentifier: quoteInfo.payinExtraId
-            }
+            uniqueIdentifier: quoteInfo.payinExtraId || undefined
           }
-        ]
+        ],
+        swapData: {
+          orderId: quoteInfo.id,
+          orderUri: orderUri + quoteInfo.id,
+          isEstimate: true,
+          payoutAddress: toAddress,
+          payoutCurrencyCode: request.toCurrencyCode,
+          payoutNativeAmount: toNativeAmount,
+          payoutWalletId: request.toWallet.id,
+          plugin: { ...swapInfo },
+          refundAddress: fromAddress
+        }
       }
-      io.console.info('Starting ChangeHero')
+      log('spendInfo', spendInfo)
       const tx: EdgeTransaction = await request.fromWallet.makeSpend(spendInfo)
-      if (tx.otherParams == null) tx.otherParams = {}
-
-      tx.otherParams.payinAddress = spendInfo.spendTargets[0].publicAddress
-      tx.otherParams.uniqueIdentifier =
-        spendInfo.spendTargets[0].otherParams.uniqueIdentifier
 
       return makeSwapPluginQuote(
         request,

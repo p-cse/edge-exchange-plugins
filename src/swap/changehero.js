@@ -15,6 +15,7 @@ import {
 } from 'edge-core-js/types'
 
 import { makeSwapPluginQuote, safeCurrencyCodes } from '../swap-helpers.js'
+import {asObject, asString} from "cleaners";
 
 const CURRENCY_CODE_TRANSCRIPTION = {
   ethereum: {
@@ -71,6 +72,12 @@ type FixedQuoteInfo = {
   refundExtraId: string | null,
   status: string
 }
+
+const asFixedRateQuote = asObject({
+  result: asObject({
+    id: asString
+  })
+})
 
 const dontUseLegacy = {
   DGB: true
@@ -168,7 +175,7 @@ export function makeChangeHeroPlugin(
         request
       )
 
-      const fixedRateQuote = await call({
+      const fixedRateQuoteResponse = await call({
         jsonrpc: '2.0',
         id: 'one',
         method: 'getFixRate',
@@ -177,29 +184,7 @@ export function makeChangeHeroPlugin(
           to: safeToCurrencyCode
         }
       })
-      const min =
-        request.quoteFor === 'from'
-          ? fixedRateQuote.result.minFrom
-          : fixedRateQuote.result.minTo
-      const max =
-        request.quoteFor === 'from'
-          ? fixedRateQuote.result.maxFrom
-          : fixedRateQuote.result.maxTo
-
-      const nativeMin = await request.fromWallet.denominationToNative(
-        min,
-        safeFromCurrencyCode
-      )
-      const nativeMax = await request.fromWallet.denominationToNative(
-        max,
-        safeFromCurrencyCode
-      )
-      if (lt(request.nativeAmount, nativeMin)) {
-        throw new SwapBelowLimitError(swapInfo, nativeMin)
-      }
-      if (gt(request.nativeAmount, nativeMax)) {
-        throw new SwapAboveLimitError(swapInfo, nativeMax)
-      }
+      const fixedRateQuote = asFixedRateQuote(fixedRateQuoteResponse)
       const params =
         request.quoteFor === 'from'
           ? {

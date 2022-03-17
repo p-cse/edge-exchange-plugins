@@ -1,6 +1,7 @@
 // @flow
 
-import { gt, lt, mul } from 'biggystring'
+import { lt, mul } from 'biggystring'
+import { asObject, asString } from 'cleaners'
 import {
   type EdgeCorePluginOptions,
   type EdgeCurrencyWallet,
@@ -9,13 +10,11 @@ import {
   type EdgeSwapQuote,
   type EdgeSwapRequest,
   type EdgeTransaction,
-  SwapAboveLimitError,
   SwapBelowLimitError,
   SwapCurrencyError
 } from 'edge-core-js/types'
 
 import { makeSwapPluginQuote, safeCurrencyCodes } from '../swap-helpers.js'
-import {asObject, asString} from "cleaners";
 
 const CURRENCY_CODE_TRANSCRIPTION = {
   ethereum: {

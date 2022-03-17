@@ -1,7 +1,6 @@
 // @flow
 
 import { lt, mul } from 'biggystring'
-import { asObject, asString } from 'cleaners'
 import {
   type EdgeCorePluginOptions,
   type EdgeCurrencyWallet,
@@ -71,12 +70,6 @@ type FixedQuoteInfo = {
   refundExtraId: string | null,
   status: string
 }
-
-const asFixedRateQuote = asObject({
-  result: asObject({
-    id: asString
-  })
-})
 
 const dontUseLegacy = {
   DGB: true
@@ -174,7 +167,7 @@ export function makeChangeHeroPlugin(
         request
       )
 
-      const fixedRateQuoteResponse = await call({
+      const fixedRateQuote = await call({
         jsonrpc: '2.0',
         id: 'one',
         method: 'getFixRate',
@@ -183,7 +176,8 @@ export function makeChangeHeroPlugin(
           to: safeToCurrencyCode
         }
       })
-      const fixedRateQuote = asFixedRateQuote(fixedRateQuoteResponse)
+
+      const [{ id: responseId }] = fixedRateQuote.result
       const params =
         request.quoteFor === 'from'
           ? {
@@ -194,7 +188,7 @@ export function makeChangeHeroPlugin(
               extraId: null,
               refundAddress: fromAddress,
               refundExtraId: null,
-              rateId: fixedRateQuote.result.id
+              rateId: responseId
             }
           : {
               amountTo: quoteAmount,
@@ -204,7 +198,7 @@ export function makeChangeHeroPlugin(
               extraId: null,
               refundAddress: fromAddress,
               refundExtraId: null,
-              rateId: fixedRateQuote.result.id
+              rateId: responseId
             }
 
       const sendReply = await call({
@@ -216,16 +210,16 @@ export function makeChangeHeroPlugin(
       checkReply(sendReply, request)
       const quoteInfo: FixedQuoteInfo = sendReply.result
       const spendInfoAmount = await request.fromWallet.denominationToNative(
-        quoteInfo.amountExpectedFrom,
+        `${quoteInfo.amountExpectedFrom}`,
         request.fromCurrencyCode.toUpperCase()
       )
 
       const amountExpectedFromNative = await request.fromWallet.denominationToNative(
-        sendReply.result.amountExpectedFrom,
+        `${sendReply.result.amountExpectedFrom}`,
         request.fromCurrencyCode
       )
       const amountExpectedToTo = await request.toWallet.denominationToNative(
-        sendReply.result.amountExpectedTo,
+        `${sendReply.result.amountExpectedTo}`,
         request.toCurrencyCode
       )
 

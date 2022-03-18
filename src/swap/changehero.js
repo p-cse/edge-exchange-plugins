@@ -238,7 +238,6 @@ export function makeChangeHeroPlugin(
             : 'standard',
         swapData: {
           orderId: quoteInfo.id,
-          orderUri: '',
           isEstimate: false,
           payoutAddress: toAddress,
           payoutCurrencyCode: request.toCurrencyCode,
@@ -387,7 +386,6 @@ export function makeChangeHeroPlugin(
         ],
         swapData: {
           orderId: quoteInfo.id,
-          orderUri: '',
           isEstimate: true,
           payoutAddress: toAddress,
           payoutCurrencyCode: request.toCurrencyCode,

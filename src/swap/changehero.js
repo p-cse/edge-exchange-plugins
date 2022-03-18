@@ -37,7 +37,7 @@ const swapInfo: EdgeSwapInfo = {
   supportEmail: 'support@changehero.io'
 }
 
-const orderUri = 'https://changehero.io/transaction/'
+// const orderUri = 'https://changehero.io/transaction/'
 const uri = 'https://api.changehero.io/v2'
 const expirationMs = 1000 * 60 * 20
 const expirationFixedMs = 1000 * 60 * 5
@@ -238,7 +238,7 @@ export function makeChangeHeroPlugin(
             : 'standard',
         swapData: {
           orderId: quoteInfo.id,
-          orderUri: orderUri + quoteInfo.id,
+          orderUri: '',
           isEstimate: false,
           payoutAddress: toAddress,
           payoutCurrencyCode: request.toCurrencyCode,
@@ -387,7 +387,7 @@ export function makeChangeHeroPlugin(
         ],
         swapData: {
           orderId: quoteInfo.id,
-          orderUri: orderUri + quoteInfo.id,
+          orderUri: '',
           isEstimate: true,
           payoutAddress: toAddress,
           payoutCurrencyCode: request.toCurrencyCode,

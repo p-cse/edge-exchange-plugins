@@ -134,14 +134,9 @@ export function makeChangeHeroPlugin(
       userSettings: Object | void
     ): Promise<EdgeSwapQuote> {
       const fixedPromise = this.getFixedQuote(request, userSettings)
-      const estimatePromise = this.getEstimate(request, userSettings)
-      try {
-        const fixedResult = await fixedPromise
-        return fixedResult
-      } catch (e) {
-        const estimateResult = await estimatePromise
-        return estimateResult
-      }
+      // Estimated swaps disabled
+      const fixedResult = await fixedPromise
+      return fixedResult
     },
     async getFixedQuote(
       request: EdgeSwapRequest,

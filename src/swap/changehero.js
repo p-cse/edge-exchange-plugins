@@ -5,6 +5,7 @@ import {
   type EdgeCorePluginOptions,
   type EdgeCurrencyWallet,
   type EdgeSpendInfo,
+  type EdgeSwapInfo,
   type EdgeSwapPlugin,
   type EdgeSwapQuote,
   type EdgeSwapRequest,

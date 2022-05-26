@@ -103,6 +103,26 @@ function checkReply(reply: Object, request: EdgeSwapRequest) {
   }
 }
 
+function checkEthOnly(request: EdgeSwapRequest) {
+  const currencyFromWallet = request.fromWallet.currencyInfo.currencyCode
+  const currencyToWallet = request.toWallet.currencyInfo.currencyCode
+
+  let fromError = false
+  let toError = false
+
+  if (currencyFromWallet !== request.fromCurrencyCode) {
+    fromError = true
+  } else if (currencyToWallet !== request.toCurrencyCode) {
+    toError = true
+  }
+
+  if (fromError && currencyFromWallet !== 'ETH') {
+    throw new Error('Currency not supported')
+  } else if (toError && currencyToWallet !== 'ETH') {
+    throw new Error('Currency not supported')
+  }
+}
+
 export function makeChangeHeroPlugin(
   opts: EdgeCorePluginOptions
 ): EdgeSwapPlugin {
@@ -135,6 +155,7 @@ export function makeChangeHeroPlugin(
       request: EdgeSwapRequest,
       userSettings: Object | void
     ): Promise<EdgeSwapQuote> {
+      checkEthOnly(request)
       return this.getFixedQuote(request, userSettings)
     },
     async getFixedQuote(
